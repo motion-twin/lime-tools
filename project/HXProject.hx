@@ -53,6 +53,7 @@ class HXProject {
 	public var templateContext (get_templateContext, null):Dynamic;
 	public var templatePaths:Array <String>;
 	public var window:Window;
+	public var postBuildCommands:Array <String>;
 	
 	private var defaultApp:ApplicationData;
 	private var defaultMeta:MetaData;
@@ -193,7 +194,7 @@ class HXProject {
 		sources = new Array <String> ();
 		samplePaths = new Array <String> ();
 		splashScreens = new Array <SplashScreen> ();
-		
+		postBuildCommands = new Array <String> ();
 	}
 	
 	

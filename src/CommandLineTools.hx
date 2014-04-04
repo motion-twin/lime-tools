@@ -211,6 +211,14 @@ class CommandLineTools {
 				LogHelper.info ("", "\n\x1b[32;1mRunning command: BUILD\x1b[0m");
 				platform.build (project);
 				
+				if ( project.postBuildCommands.length > 0 ) {
+ 					LogHelper.println("** POST BUILD **");
+ 					for ( cmd in project.postBuildCommands ) {
+ 						LogHelper.println(cmd);
+ 						if ( Sys.command( cmd ) != 0 )
+ 							throw "Error running "+cmd;
+ 					}
+ 				}
 			}
 			
 			if (!Reflect.hasField (metaFields.install, "ignore") && (command == "install" || command == "run" || command == "test")) {
