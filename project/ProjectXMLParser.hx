@@ -21,17 +21,21 @@ class ProjectXMLParser extends HXProject {
 	
 	
 	public var includePaths:Array <String>;
+	public var localDefines:Map <String, Dynamic>;
 	
 	private static var varMatch = new EReg("\\${(.*?)}", "");
 	
-	
+	private var filePath:String;
 	public function new (path:String = "", defines:Map <String, Dynamic> = null, includePaths:Array <String> = null, useExtensionPath:Bool = false) {
-		
 		super ();
-		
+		filePath = path;
 		if (defines != null) {
 			
-			this.defines = StringMapHelper.copy (defines);
+			localDefines = StringMapHelper.copy (defines);
+			
+		} else {
+			
+			localDefines = new Map <String, Dynamic> ();
 			
 		}
 		
@@ -62,166 +66,108 @@ class ProjectXMLParser extends HXProject {
 			
 			case MOBILE:
 				
-				defines.set ("mobile", "1");
+				localDefines.set ("mobile", "1");
 			
 			case DESKTOP:
 				
-				defines.set ("desktop", "1");
+				localDefines.set ("desktop", "1");
 			
 			case WEB:
 				
-				defines.set ("web", "1");
+				localDefines.set ("web", "1");
 			
 		}
 		
 		if (targetFlags.exists ("neko")) {
 			
-			defines.set ("native", "1");
-			defines.set ("neko", "1");
+			localDefines.set ("native", "1");
+			localDefines.set ("neko", "1");
 			
 		} else if (targetFlags.exists ("cpp") || ((platformType == PlatformType.MOBILE || platformType == PlatformType.DESKTOP) && !targetFlags.exists("html5")) || target == Platform.EMSCRIPTEN) {
 			
-			defines.set ("native", "1");
-			defines.set ("cpp", "1");
+			localDefines.set ("native", "1");
+			localDefines.set ("cpp", "1");
 			
 		}
 		
 		if (target == Platform.EMSCRIPTEN) {
 			
-			defines.set ("native", "1");
+			localDefines.set ("native", "1");
 			
 		}
 		
-		defines.set ("haxe3", "1");
+		localDefines.set ("haxe3", "1");
+		
+		if (command != null) {
+			
+			localDefines.set (command.toLowerCase (), "1");
+			
+		}
 		
 		if (debug) {
 			
-			defines.set ("debug", "1");
+			localDefines.set ("debug", "1");
 			
 		} else {
 			
-			defines.set ("release", "1");
+			localDefines.set ("release", "1");
 			
 		}
 		
-		if (defines.exists ("SWF_PLAYER")) {
+		if (localDefines.exists ("SWF_PLAYER")) {
 			
-			environment.set ("SWF_PLAYER", defines.get ("SWF_PLAYER"));
+			environment.set ("SWF_PLAYER", localDefines.get ("SWF_PLAYER"));
 			
-		} else if (defines.exists ("FLASH_PLAYER_EXE")) {
+		} else if (localDefines.exists ("FLASH_PLAYER_EXE")) {
 			
-			environment.set ("FLASH_PLAYER_EXE", defines.get ("SWF_PLAYER"));
+			environment.set ("FLASH_PLAYER_EXE", localDefines.get ("SWF_PLAYER"));
 			
 		}
 		
-		defines.set (Type.enumConstructor (target).toLowerCase (), "1");
+		localDefines.set (Type.enumConstructor (target).toLowerCase (), "1");
 		
 	}
 	
 	
 	private function isValidElement (element:Fast, section:String):Bool {
 		
-		if (element.x.get ("if") != null) {
+		if( element.x.get("if") != null || element.x.get("unless") != null ) {
 			
-			var value = element.x.get ("if");
-			var optionalDefines = value.split ("||");
-			var matchOptional = false;
-			
-			for (optional in optionalDefines) {
+			var parser = new hscript.Parser();
+			var interp = new hscript.Interp();
+			for( f in localDefines.keys() )
+				interp.variables.set(f, true);
 				
-				var requiredDefines = optional.split (" ");
-				var matchRequired = true;
-				
-				for (required in requiredDefines) {
-					
-					var check = StringTools.trim (required);
-					
-					if (check != "" && !defines.exists (check) && check != command) {
-						
-						matchRequired = false;
-						
+			function evaluate(script) {
+				var program = try parser.parseString(script) catch(e:Dynamic) neko.Lib.rethrow( filePath+":Invalid script tag : '"+script+"', error:"+e );
+				return try interp.execute(program) 
+					catch( e : hscript.Expr.Error  ) {
+						switch(e) {
+							case EUnknownVariable(v): false;
+							default : neko.Lib.rethrow(filePath+": error on element:"+element+" => "+e);
+						} 
+					} catch( e:Dynamic ) {
+						neko.Lib.rethrow(filePath+": error on element:"+element+" => "+e);
 					}
-					
-				}
-				
-				if (matchRequired) {
-					
-					matchOptional = true;
-					
-				}
-				
 			}
 			
-			if (optionalDefines.length > 0 && !matchOptional) {
-				
-				return false;
-				
-			}
-			
-		}
-		
-		if (element.has.unless) {
-			
-			var value = substitute (element.att.unless);
-			var optionalDefines = value.split ("||");
-			var matchOptional = false;
-			
-			for (optional in optionalDefines) {
-				
-				var requiredDefines = optional.split (" ");
-				var matchRequired = true;
-				
-				for (required in requiredDefines) {
-					
-					var check = StringTools.trim (required);
-					if (check != "" && !defines.exists (check) && check != command) {
-						
-						matchRequired = false;
-						
-					}
-					
-				}
-				
-				if (matchRequired) {
-					
-					matchOptional = true;
-					
-				}
-				
-			}
-			
-			if (optionalDefines.length > 0 && matchOptional) {
-				
-				return false;
-				
-			}
-			
+			if( element.x.get("if") != null && !evaluate(element.x.get("if")) ) return false;
+			if( element.x.get("unless") != null && evaluate(element.x.get("unless")) ) return false;
 		}
 		
 		if (section != "") {
-			
 			if (element.name != "section") {
-				
 				return false;
-				
 			}
-			
 			if (!element.has.id) {
-				
 				return false;
-				
 			}
-			
 			if (substitute (element.att.id) != section) {
-				
 				return false;
-				
 			}
-			
 		}
 		
 		return true;
-		
 	}
 	
 	
@@ -668,7 +614,7 @@ class ProjectXMLParser extends HXProject {
 					
 					var value = substitute (element.att.resolve (attribute));
 					
-					defines.set ("APP_" + StringTools.replace (attribute, "-", "_").toUpperCase (), value);
+					localDefines.set ("APP_" + StringTools.replace (attribute, "-", "_").toUpperCase (), value);
 					
 					var name = formatAttributeName (attribute);
 					
@@ -743,12 +689,12 @@ class ProjectXMLParser extends HXProject {
 							
 						}
 						
-						defines.set (name, value);
+						localDefines.set (name, value);
 						environment.set (name, value);
 					
 					case "unset":
 						
-						defines.remove (element.att.name);
+						localDefines.remove (element.att.name);
 						environment.remove (element.att.name);
 					
 					case "setenv":
@@ -767,7 +713,7 @@ class ProjectXMLParser extends HXProject {
 						
 						var name = substitute (element.att.name);
 						
-						defines.set (name, value);
+						localDefines.set (name, value);
 						environment.set (name, value);
 						setenv (name, value);
 					
@@ -778,6 +724,10 @@ class ProjectXMLParser extends HXProject {
 					case "echo":
 						
 						Sys.println (substitute (element.att.value));
+
+					case "postBuild":
+						if( element.has.command )
+							postBuildCommands.push( element.att.command );					
 					
 					case "path":
 						
@@ -832,7 +782,7 @@ class ProjectXMLParser extends HXProject {
 						
 						if (path != null && path != "" && FileSystem.exists (path) && !FileSystem.isDirectory (path)) {
 							
-							var includeProject = new ProjectXMLParser (path, defines);
+							var includeProject = new ProjectXMLParser (path, localDefines);
 							
 							if (includeProject != null && haxelib != null) {
 								
@@ -900,7 +850,7 @@ class ProjectXMLParser extends HXProject {
 							
 						}
 						
-						/*if (name == "nme" && defines.exists ("openfl")) {
+						/*if (name == "nme" && localDefines.exists ("openfl")) {
 							
 							name = "openfl-nme-compatibility";
 							version = "";
@@ -910,7 +860,7 @@ class ProjectXMLParser extends HXProject {
 						var haxelib = new Haxelib (name, version);
 						var path;
 						
-						if (defines.exists ("setup")) {
+						if (localDefines.exists ("setup")) {
 							
 							path = PathHelper.getHaxelib (haxelib);
 							
@@ -922,7 +872,7 @@ class ProjectXMLParser extends HXProject {
 						
 						haxelibs.push (haxelib);
 						
-						var includeProject = HXProject.fromHaxelib (haxelib, defines);
+						var includeProject = HXProject.fromHaxelib (haxelib);
 						
 						if (includeProject != null) {
 							
@@ -954,7 +904,7 @@ class ProjectXMLParser extends HXProject {
 						
 						if (haxelib == null && (name == "std" || name == "regexp" || name == "zlib")) {
 							
-							/*if (defines.exists ("nme")) {
+							/*if (localDefines.exists ("nme")) {
 								
 								haxelib = new Haxelib ("hxcpp");
 								
@@ -966,13 +916,13 @@ class ProjectXMLParser extends HXProject {
 							
 						}
 						
-						/*if (haxelib != null && haxelib.name == "nme" && !defines.exists ("nme")) {
+						/*if (haxelib != null && haxelib.name == "nme" && !localDefines.exists ("nme")) {
 							
 							haxelib = new Haxelib ("lime");
 							
 						}
 						
-						if (name == "nme" && !defines.exists ("nme")) {
+						if (name == "nme" && !localDefines.exists ("nme")) {
 							
 							name = "lime";
 							
@@ -1000,9 +950,7 @@ class ProjectXMLParser extends HXProject {
 								
 							}
 							
-						}
-						
-						if (element.has.exclude) {
+						} else if (element.has.exclude) {
 							
 							var exclude = substitute (element.att.exclude);
 							
@@ -1547,7 +1495,7 @@ class ProjectXMLParser extends HXProject {
 				
 			} else {
 				
-				substring = defines.get (substring);
+				substring = localDefines.get (substring);
 				
 			}
 			
