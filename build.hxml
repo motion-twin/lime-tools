@@ -5,6 +5,4 @@
 -lib openfl-native
 -lib format
 -lib svg
--lib swf
--lib hscript
 --remap flash:flash
