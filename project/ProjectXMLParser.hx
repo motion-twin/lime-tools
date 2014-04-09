@@ -817,7 +817,22 @@ class ProjectXMLParser extends HXProject {
 							
 							if (path == "" || FileSystem.isDirectory (path)) {
 								
-								var errorPath = (element.has.path ? element.att.path : element.att.name);
+								var errorPath = "";
+								
+								if (element.has.path) {
+									
+									errorPath = element.att.path;
+									
+								} else if (element.has.name) {
+									
+									errorPath = element.att.name;
+									
+								} else {
+									
+									errorPath = Std.string (element);
+									
+								}
+								
 								LogHelper.error ("\"" + errorPath + "\" does not appear to be a valid <include /> path");
 								
 							} else {
@@ -905,15 +920,15 @@ class ProjectXMLParser extends HXProject {
 						
 						if (haxelib == null && (name == "std" || name == "regexp" || name == "zlib")) {
 							
-							/*if (defines.exists ("nme")) {
+							if (config.cpp.buildLibrary != null) {
+								
+								haxelib = new Haxelib (config.cpp.buildLibrary);
+								
+							} else {
 								
 								haxelib = new Haxelib ("hxcpp");
 								
-							} else {
-								*/
-								haxelib = new Haxelib ("hxlibc");
-								
-							//}
+							}
 							
 						}
 						
