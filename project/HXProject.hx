@@ -142,7 +142,7 @@ class HXProject {
 					
 				} else if (target == Platform.ANDROID) {
 					
-					architectures = [ Architecture.ARMV6, Architecture.ARMV7 ];
+					architectures = [ Architecture.ARMV7 ];
 					
 				} else {
 					
