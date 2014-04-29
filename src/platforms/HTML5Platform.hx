@@ -101,11 +101,32 @@ class HTML5Platform implements IPlatformTool {
 		var destination = outputDirectory + "/bin/";
 		PathHelper.mkdir (destination);
 		
+		var useWebfonts = true;
+		
+		for (haxelib in project.haxelibs) {
+			
+			if (haxelib.name == "openfl-html5-dom" || haxelib.name == "openfl-bitfive") {
+				
+				useWebfonts = false;
+				
+			}
+			
+		}
+		
 		for (asset in project.assets) {
 			
 			if (asset.type == AssetType.FONT) {
 				
-				project.haxeflags.push (HTML5Helper.generateFontData (project, asset));
+				if (useWebfonts) {
+					
+					HTML5Helper.generateWebfonts (project, asset);
+					asset.targetPath = Path.withoutExtension (asset.targetPath);
+					
+				} else {
+					
+					project.haxeflags.push (HTML5Helper.generateFontData (project, asset));
+					
+				}
 				
 			}
 			
@@ -119,7 +140,7 @@ class HTML5Platform implements IPlatformTool {
 		
 		var context = project.templateContext;
 		
-		context.WIN_FLASHBACKGROUND = StringTools.hex (project.window.background, 6);
+		context.WIN_FLASHBACKGROUND = StringTools.hex (project.window[0].background, 6);
 		context.OUTPUT_DIR = outputDirectory;
 		context.OUTPUT_FILE = outputFile;
 		
@@ -139,6 +160,22 @@ class HTML5Platform implements IPlatformTool {
 					
 					PathHelper.mkdir (Path.directory (path));
 					FileHelper.copyAssetIfNewer (asset, path);
+					
+				} else if (useWebfonts) {
+					
+					PathHelper.mkdir (Path.directory (path));
+					var ext = "." + Path.extension (asset.sourcePath);
+					var source = Path.withoutExtension (asset.sourcePath);
+					
+					for (extension in [ ext, ".eot", ".woff", ".svg" ]) {
+						
+						if (FileSystem.exists (source + extension)) {
+							
+							FileHelper.copyFile (source + extension, path + extension);
+							
+						}
+						
+					}
 					
 				}
 				

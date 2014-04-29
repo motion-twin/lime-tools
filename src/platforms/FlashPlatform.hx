@@ -41,13 +41,6 @@ class FlashPlatform implements IPlatformTool {
 			
 		}
 		
-		if (project.targetFlags.exists ("web") || project.app.url != "") {
-			
-			PathHelper.mkdir (destination);
-			FileHelper.recursiveCopyTemplate (project.templatePaths, "flash/templates/web", destination, generateContext (project));
-			
-		}
-		
 	}
 	
 	
@@ -69,7 +62,7 @@ class FlashPlatform implements IPlatformTool {
 		var hxml = PathHelper.findTemplate (project.templatePaths, "flash/hxml/" + (project.debug ? "debug" : "release") + ".hxml");
 		
 		var context = project.templateContext;
-		context.WIN_FLASHBACKGROUND = StringTools.hex (project.window.background, 6);
+		context.WIN_FLASHBACKGROUND = StringTools.hex (project.window[0].background, 6);
 		
 		var template = new Template (File.getContent (hxml));
 		Sys.println (template.execute (context));
@@ -88,7 +81,7 @@ class FlashPlatform implements IPlatformTool {
 		}
 		
 		var context = project.templateContext;
-		context.WIN_FLASHBACKGROUND = StringTools.hex (project.window.background, 6);
+		context.WIN_FLASHBACKGROUND = StringTools.hex (project.window[0].background, 6);
 		var assets:Array <Dynamic> = cast context.assets;
 		
 		for (asset in assets) {
@@ -141,17 +134,6 @@ class FlashPlatform implements IPlatformTool {
 		var destination = project.app.path + "/flash/bin/";
 		PathHelper.mkdir (destination);
 		
-		/*for (asset in assets) {
-			
-			if (!asset.embed) {
-				
-				PathHelper.mkdir (Path.directory (destination + asset.targetPath));
-				FileHelper.copyIfNewer (asset.sourcePath, destination + asset.targetPath);
-				
-			}
-			
-		}*/
-		
 		var context = generateContext (project);
 		
 		FileHelper.recursiveCopyTemplate (project.templatePaths, "haxe", project.app.path + "/flash/haxe", context);
@@ -171,18 +153,25 @@ class FlashPlatform implements IPlatformTool {
 			}
 			
 		}
-		
-		for (asset in project.assets) {
+
+		if (project.targetFlags.exists ("web") || project.app.url != "") {
 			
-			if (asset.type == AssetType.TEMPLATE || asset.embed != true || !usesNME) {
+			PathHelper.mkdir (destination);
+			FileHelper.recursiveCopyTemplate (project.templatePaths, "flash/templates/web", destination, generateContext (project));
+
+			for (asset in project.assets) {
 				
-				var path = PathHelper.combine (destination, asset.targetPath);
-				
-				PathHelper.mkdir (Path.directory (path));
-				FileHelper.copyAsset (asset, path, context);
+				if (asset.type == AssetType.TEMPLATE || asset.embed == false || !usesNME) {
+					
+					var path = PathHelper.combine (destination, asset.targetPath);
+					
+					PathHelper.mkdir (Path.directory (path));
+					FileHelper.copyAsset (asset, path, context);
+					
+				}
 				
 			}
-			
+
 		}
 		
 		

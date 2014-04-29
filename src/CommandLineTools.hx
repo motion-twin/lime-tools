@@ -208,6 +208,15 @@ class CommandLineTools {
 			
 			if (!Reflect.hasField (metaFields.build, "ignore") && (command == "build" || command == "test")) {
 				
+				if ( project.preBuildCommands.length > 0 ) {
+  					LogHelper.println("** PRE BUILD **");
+  					for ( cmd in project.preBuildCommands ) {
+  						LogHelper.println(cmd);
+  						if ( Sys.command( cmd ) != 0 )
+  							throw "Error running "+cmd;
+  					}
+  				}
+ 
 				LogHelper.info ("", "\n\x1b[32;1mRunning command: BUILD\x1b[0m");
 				platform.build (project);
 				
@@ -670,10 +679,9 @@ class CommandLineTools {
 		
 		var process = new Process (command, [ "path", "lime-tools" ]);
 		var path = "";
+		var lines = new Array <String> ();
 		
 		try {
-			
-			var lines = new Array <String> ();
 			
 			while (true) {
 				
@@ -691,6 +699,28 @@ class CommandLineTools {
    			}
    			
 		} catch (e:Dynamic) {
+			
+		}
+		
+		if (path == "") {
+			
+			for (line in lines) {
+				
+				if (line != "" && line.substr (0, 1) != "-") {
+					
+					try {
+						
+						if (FileSystem.exists (line)) {
+							
+							path = line;
+							
+						}
+						
+					} catch (e:Dynamic) {}
+					
+				}
+				
+			}
 			
 		}
 		
@@ -1295,7 +1325,8 @@ class CommandLineTools {
 			
 		}
 		
-		var path = PathHelper.getHaxelib (new Haxelib (name));
+		var haxelib = new Haxelib (name);
+		var path = PathHelper.getHaxelib (haxelib);
 		
 		switch (command) {
 			
@@ -1303,12 +1334,15 @@ class CommandLineTools {
 				
 				if (path == null || path == "") {
 					
-					var haxePath = Sys.getEnv ("HAXEPATH");
-					ProcessHelper.runCommand (haxePath, "haxelib", [ "install", name ]);
+					PlatformSetup.installHaxelib (haxelib);
+					
+				} else {
+					
+					PlatformSetup.updateHaxelib (haxelib);
 					
 				}
 				
-				PlatformSetup.run (name, userDefines, targetFlags);
+				PlatformSetup.setupHaxelib (haxelib);
 			
 			case "remove":
 				
@@ -1323,13 +1357,12 @@ class CommandLineTools {
 				
 				if (path != null && path != "") {
 					
-					var haxePath = Sys.getEnv ("HAXEPATH");
-					ProcessHelper.runCommand (haxePath, "haxelib", [ "update", name ]);
+					PlatformSetup.updateHaxelib (haxelib);
+					PlatformSetup.setupHaxelib (haxelib);
 					
-					var defines = StringMapHelper.copy (userDefines);
-					defines.set ("upgrade", 1);
+				} else {
 					
-					PlatformSetup.run (name, defines, targetFlags);
+					LogHelper.warn ("\"" + haxelib.name + "\" is not a valid haxelib, or has not been installed");
 					
 				}
 			

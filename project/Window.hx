@@ -5,10 +5,13 @@ typedef Window = {
 	
 	@:optional var width:Int;
 	@:optional var height:Int;
+	@:optional var x:Float;
+	@:optional var y:Float;
 	@:optional var background:Int;
 	@:optional var parameters:String;
 	@:optional var fps:Int;
 	@:optional var hardware:Bool;
+	@:optional var display:Int;
 	@:optional var resizable:Bool;
 	@:optional var borderless:Bool;
 	@:optional var vsync:Bool;

@@ -5,6 +5,7 @@ import haxe.io.Path;
 import haxe.xml.Fast;
 import helpers.ArrayHelper;
 import helpers.LogHelper;
+import helpers.ObjectHelper;
 import helpers.PathHelper;
 import helpers.StringMapHelper;
 import project.Asset;
@@ -380,7 +381,7 @@ class ProjectXMLParser extends HXProject {
 	private function parseAssetsElement (element:Fast, basePath:String = "", isTemplate:Bool = false):Void {
 		
 		var path = "";
-		var embed = true;
+		var embed:Null<Bool> = null;
 		var targetPath = "";
 		var glyphs = null;
 		var type = null;
@@ -544,7 +545,7 @@ class ProjectXMLParser extends HXProject {
 					
 					var childPath = substitute (childElement.has.name ? childElement.att.name : childElement.att.path);
 					var childTargetPath = childPath;
-					var childEmbed = embed;
+					var childEmbed:Null<Bool> = embed;
 					var childType = type;
 					var childGlyphs = glyphs;
 					
@@ -615,7 +616,7 @@ class ProjectXMLParser extends HXProject {
 	}
 	
 	
-	private function parseAssetsElementDirectory (path:String, targetPath:String, include:String, exclude:String, type:AssetType, embed:Bool, glyphs:String, recursive:Bool):Void {
+	private function parseAssetsElementDirectory (path:String, targetPath:String, include:String, exclude:String, type:AssetType, embed:Null<Bool>, glyphs:String, recursive:Bool):Void {
 		
 		var files = FileSystem.readDirectory (path);
 		
@@ -969,6 +970,7 @@ class ProjectXMLParser extends HXProject {
 						
 						var name = substitute (element.att.name);
 						var haxelib = null;
+						var type = NDLLType.AUTO;
 						var registerStatics = true;
 						
 						if (element.has.haxelib) {
@@ -1003,13 +1005,19 @@ class ProjectXMLParser extends HXProject {
 							
 						}*/
 						
+						if (element.has.type) {
+							
+							type = Reflect.field (NDLLType, substitute (element.att.type).toUpperCase ());
+							
+						}
+						
 						if (element.has.register) {
 							
 							registerStatics = (substitute (element.att.register) == "true");
 							
 						}
 						
-						var ndll = new NDLL (name, haxelib, registerStatics);
+						var ndll = new NDLL (name, haxelib, type, registerStatics);
 						ndll.extensionPath = extensionPath;
 						ndlls.push (ndll);
 						
@@ -1173,7 +1181,7 @@ class ProjectXMLParser extends HXProject {
 							var path = PathHelper.combine (extensionPath, substitute (element.att.path));
 							var name = "";
 							var type = null;
-							var embed = null;
+							var embed:Null<Bool> = null;
 							
 							if (element.has.name) {
 								
@@ -1472,6 +1480,20 @@ class ProjectXMLParser extends HXProject {
 	
 	private function parseWindowElement (element:Fast):Void {
 		
+		var id = 0;
+		
+		if (element.has.id) {
+			
+			id = Std.parseInt (substitute (element.att.id));
+			
+		}
+		
+		while (id >= window.length) {
+			
+			window.push (ObjectHelper.copyFields (defaultWindow, {}));
+			
+		}
+		
 		for (attribute in element.x.attributes ()) {
 			
 			var name = formatAttributeName (attribute);
@@ -1489,7 +1511,7 @@ class ProjectXMLParser extends HXProject {
 						
 					}
 					
-					window.background = Std.parseInt (value);
+					window[id].background = Std.parseInt (value);
 				
 				case "orientation":
 					
@@ -1497,35 +1519,35 @@ class ProjectXMLParser extends HXProject {
 					
 					if (orientation != null) {
 						
-						window.orientation = orientation;
+						window[id].orientation = orientation;
 						
 					}
 				
 				case "height", "width", "fps", "antialiasing":
 					
-					if (Reflect.hasField (window, name)) {
+					if (Reflect.hasField (window[id], name)) {
 						
-						Reflect.setField (window, name, Std.parseInt (value));
+						Reflect.setField (window[id], name, Std.parseInt (value));
 						
 					}
 				
 				case "parameters":
 					
-					if (Reflect.hasField (window, name)) {
+					if (Reflect.hasField (window[id], name)) {
 						
-						Reflect.setField (window, name, Std.string (value));
+						Reflect.setField (window[id], name, Std.string (value));
 						
 					}
 				
 				default:
 					
-					if (Reflect.hasField (window, name)) {
+					if (Reflect.hasField (window[id], name)) {
 						
-						Reflect.setField (window, name, value == "true");
+						Reflect.setField (window[id], name, value == "true");
 						
-					} else if (Reflect.hasField (window, formatAttributeName (name))) {
+					} else if (Reflect.hasField (window[id], formatAttributeName (name))) {
 						
-						Reflect.setField (window, formatAttributeName (name), value == "true");
+						Reflect.setField (window[id], formatAttributeName (name), value == "true");
 						
 					}
 				

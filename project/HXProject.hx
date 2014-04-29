@@ -52,8 +52,9 @@ class HXProject {
 	public var targetFlags:Map <String, String>;
 	public var templateContext (get_templateContext, null):Dynamic;
 	public var templatePaths:Array <String>;
-	public var window:Window;
+	public var window:Array <Window>;
 	public var postBuildCommands:Array <String>;
+	public var preBuildCommands:Array <String>;
 	
 	private var defaultApp:ApplicationData;
 	private var defaultMeta:MetaData;
@@ -105,7 +106,7 @@ class HXProject {
 		
 		defaultMeta = { title: "MyApplication", description: "", packageName: "com.example.myapp", version: "1.0.0", company: "Example, Inc.", companyURL: "", buildNumber: "1", companyID: "" }
 		defaultApp = { main: "Main", file: "MyApplication", path: "bin", preloader: "NMEPreloader", swfVersion: 11.2, url: "" }
-		defaultWindow = { width: 800, height: 600, parameters: "{}", background: 0xFFFFFF, fps: 30, hardware: true, resizable: true, borderless: false, orientation: Orientation.AUTO, vsync: false, fullscreen: false, antialiasing: 0, allowShaders: true, requireShaders: false, depthBuffer: false, stencilBuffer: false }
+		defaultWindow = { width: 800, height: 600, parameters: "{}", background: 0xFFFFFF, fps: 30, hardware: true, display: 0, resizable: true, borderless: false, orientation: Orientation.AUTO, vsync: false, fullscreen: false, antialiasing: 0, allowShaders: true, requireShaders: false, depthBuffer: false, stencilBuffer: false }
 		
 		switch (target) {
 			
@@ -171,14 +172,9 @@ class HXProject {
 			
 		}
 		
-		meta = {};
-		app = {};
-		window = {};
-		
-		ObjectHelper.copyFields (defaultMeta, meta);
-		ObjectHelper.copyFields (defaultApp, app);
-		ObjectHelper.copyFields (defaultWindow, window);
-		
+		meta = ObjectHelper.copyFields (defaultMeta, {});
+		app = ObjectHelper.copyFields (defaultApp, {});
+		window = [ ObjectHelper.copyFields (defaultWindow, {}) ];
 		assets = new Array <Asset> ();
 		defines = new Map <String, Dynamic> ();
 		dependencies = new Array <Dependency> ();
@@ -195,6 +191,7 @@ class HXProject {
 		samplePaths = new Array <String> ();
 		splashScreens = new Array <SplashScreen> ();
 		postBuildCommands = new Array <String> ();
+		preBuildCommands = new Array <String> ();
 	}
 	
 	
@@ -302,7 +299,11 @@ class HXProject {
 		
 		project.templatePaths = templatePaths.copy ();
 		
-		ObjectHelper.copyFields (window, project.window);
+		for (i in 0...window.length) {
+			
+			project.window[i] = (ObjectHelper.copyFields (window[i], {}));
+			
+		}
 		
 		return project;
 		
@@ -570,7 +571,20 @@ class HXProject {
 			
 			ObjectHelper.copyUniqueFields (project.meta, meta, project.defaultMeta);
 			ObjectHelper.copyUniqueFields (project.app, app, project.defaultApp);
-			ObjectHelper.copyUniqueFields (project.window, window, project.defaultWindow);
+			
+			for (i in 0...project.window.length) {
+				
+				if (i < window.length) {
+					
+					ObjectHelper.copyUniqueFields (project.window[i], window[i], project.defaultWindow);
+					
+				} else {
+					
+					window.push (ObjectHelper.copyFields (project.window[i], {}));
+					
+				}
+				
+			}
 			
 			StringMapHelper.copyUniqueKeys (project.defines, defines);
 			StringMapHelper.copyUniqueKeys (project.environment, environment);
@@ -712,11 +726,16 @@ class HXProject {
 		
 		if (app == null) app = { };
 		if (meta == null) meta = { };
-		if (window == null) window = { };
+		if (window == null) window = [ { } ];
 		
 		ObjectHelper.copyMissingFields (defaultApp, app);
 		ObjectHelper.copyMissingFields (defaultMeta, meta);
-		ObjectHelper.copyMissingFields (defaultWindow, window);
+		
+		for (item in window) {
+			
+			ObjectHelper.copyMissingFields (defaultWindow, item);
+			
+		}
 		
 		config.populate ();
 		
@@ -743,9 +762,42 @@ class HXProject {
 		
 		context.APP_PACKAGE = context.META_PACKAGE = meta.packageName;
 		
-		for (field in Reflect.fields (window)) {
+		for (field in Reflect.fields (window[0])) {
 			
-			Reflect.setField (context, "WIN_" + StringHelper.formatUppercaseVariable (field), Reflect.field (window, field));
+			Reflect.setField (context, "WIN_" + StringHelper.formatUppercaseVariable (field), Reflect.field (window[0], field));
+			Reflect.setField (context, "WINDOW_" + StringHelper.formatUppercaseVariable (field), Reflect.field (window[0], field));
+			
+		}
+		
+		if (window[0].orientation == Orientation.LANDSCAPE || window[0].orientation == Orientation.PORTRAIT) {
+			
+			context.WIN_ORIENTATION = Std.string (window[0].orientation).toLowerCase ();
+			context.WINDOW_ORIENTATION = Std.string (window[0].orientation).toLowerCase ();
+			
+		} else {
+			
+			context.WIN_ORIENTATION = "";
+			context.WINDOW_ORIENTATION = "";
+			
+		}
+		
+		for (i in 0...window.length) {
+			
+			for (field in Reflect.fields (window[i])) {
+				
+				Reflect.setField (context, "WINDOW_" + StringHelper.formatUppercaseVariable (field) + "_" + i, Reflect.field (window[i], field));
+				
+			}
+			
+			if (window[i].orientation == Orientation.LANDSCAPE || window[i].orientation == Orientation.PORTRAIT) {
+				
+				Reflect.setField (context, "WINDOW_ORIENTATION_" + i, Std.string (window[i].orientation).toLowerCase ());
+				
+			} else {
+				
+				Reflect.setField (context, "WINDOW_ORIENTATION_" + i, "");
+				
+			}
 			
 		}
 		
@@ -767,23 +819,19 @@ class HXProject {
 				
 				var embeddedAsset:Dynamic = { };
 				ObjectHelper.copyFields (asset, embeddedAsset);
+				
+				if (asset.embed == null) {
+					
+					embeddedAsset.embed = (platformType == PlatformType.WEB);
+					
+				}
+				
 				embeddedAsset.type = Std.string (asset.type).toLowerCase ();
 				context.assets.push (embeddedAsset);
 				
 			}
 			
 		}
-		
-		/*context.libraries = new Array <Dynamic> ();
-		
-		for (library in libraries) {
-			
-			var libraryData:Dynamic = { };
-			ObjectHelper.copyFields (library, libraryData);
-			libraryData.type = Std.string (library.type).toLowerCase ();
-			context.libraries.push (libraryData);
-			
-		}*/
 		
 		Reflect.setField (context, "ndlls", ndlls);
 		//Reflect.setField (context, "sslCaCert", sslCaCert);
@@ -904,25 +952,12 @@ class HXProject {
 		for (field in Reflect.fields (context)) {
 			
 			//Sys.println ("context." + field + " = " + Reflect.field (context, field));
+			
 		}
 		
 		context.DEBUG = debug;
 		context.SWF_VERSION = app.swfVersion;
 		context.PRELOADER_NAME = app.preloader;
-		context.WIN_BACKGROUND = window.background;
-		context.WIN_FULLSCREEN = window.fullscreen;
-		context.WIN_ORIENTATION = "";
-		
-		if (window.orientation == Orientation.LANDSCAPE || window.orientation == Orientation.PORTRAIT) {
-			
-			context.WIN_ORIENTATION = Std.string (window.orientation).toLowerCase ();
-			
-		}
-		
-		context.WIN_ALLOW_SHADERS = window.allowShaders;
-		context.WIN_REQUIRE_SHADERS = window.requireShaders;
-		context.WIN_DEPTH_BUFFER = window.depthBuffer;
-		context.WIN_STENCIL_BUFFER = window.stencilBuffer;
 		
 		if (certificate != null) {
 			

@@ -4,9 +4,12 @@ package helpers;
 import haxe.io.Path;
 import helpers.LogHelper;
 import helpers.PathHelper;
+import helpers.PlatformHelper;
 import helpers.ProcessHelper;
+import project.Architecture;
 import project.Asset;
 import project.HXProject;
+import project.Platform;
 import sys.FileSystem;
 
 
@@ -24,6 +27,51 @@ class HTML5Helper {
 		}
 		
 		return "-resource " + FileSystem.fullPath (sourcePath) + ".hash@__ASSET__" + font.flatName;
+		
+	}
+	
+	
+	public static function generateWebfonts (project:HXProject, font:Asset):Void {
+		
+		var suffix = switch (PlatformHelper.hostPlatform) {
+			
+			case Platform.WINDOWS: "-windows.exe";
+			case Platform.MAC: "-mac";
+			case Platform.LINUX: "-linux";
+			default: return;
+			
+		}
+		
+		if (suffix == "-linux") {
+			
+			if (PlatformHelper.hostArchitecture == Architecture.X86) {
+				
+				suffix += "32";
+				
+			} else {
+				
+				suffix += "64";
+				
+			}
+			
+		}
+		
+		var webify = PathHelper.findTemplate (project.templatePaths, "bin/webify" + suffix);
+		if (PlatformHelper.hostPlatform != Platform.WINDOWS) {
+			
+			Sys.command ("chmod", [ "+x", webify ]);
+			
+		}
+		
+		if (LogHelper.verbose) {
+			
+			ProcessHelper.runCommand ("", webify, [ FileSystem.fullPath (font.sourcePath) ]);
+			
+		} else {
+			
+			ProcessHelper.runProcess ("", webify, [ FileSystem.fullPath (font.sourcePath) ], true, true, true);
+			
+		}
 		
 	}
 	
