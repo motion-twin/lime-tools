@@ -120,54 +120,108 @@ class ProjectXMLParser extends HXProject {
 	
 	
 	private function isValidElement (element:Fast, section:String):Bool {
-		
-		if( element.x.get("if") != null || element.x.get("unless") != null ) {
- 			
- 			var parser = new hscript.Parser();
-			var interp = new hscript.Interp();
- 			for( f in defines.keys() )
- 				interp.variables.set(f, true);
- 				
- 			function evaluate(script) {
- 				var program = try parser.parseString(script) catch(e:Dynamic) neko.Lib.rethrow( filePath+":Invalid script tag : '"+script+"', error:"+e );
- 				return try interp.execute(program) 
- 					catch( e : hscript.Expr.Error  ) {
- 						switch(e) {
- 							case EUnknownVariable(v): false;
- 							default : neko.Lib.rethrow(filePath+": error on element:"+element+" => "+e);
- 						} 
- 					} catch( e:Dynamic ) {
- 						neko.Lib.rethrow(filePath+": error on element:"+element+" => "+e);
-  					}
+
+		if (element.x.get ("if") != null) {
+
+			var value = element.x.get ("if");
+			var optionalDefines = value.split ("||");
+			var matchOptional = false;
+
+			for (optional in optionalDefines) {
+
+				var requiredDefines = optional.split (" ");
+				var matchRequired = true;
+
+				for (required in requiredDefines) {
+
+					var check = StringTools.trim (required);
+
+					if (check != "" && !defines.exists (check) && check != command) {
+
+						matchRequired = false;
+
+					}
+
+				}
+
+				if (matchRequired) {
+
+					matchOptional = true;
+
+				}
+
 			}
-			if( element.x.get("if") != null && !evaluate(element.x.get("if")) ) return false;
- 			if( element.x.get("unless") != null && evaluate(element.x.get("unless")) ) return false;
+
+			if (optionalDefines.length > 0 && !matchOptional) {
+
+				return false;
+
+			}
+
 		}
-		
+
+		if (element.has.unless) {
+
+			var value = substitute (element.att.unless);
+			var optionalDefines = value.split ("||");
+			var matchOptional = false;
+
+			for (optional in optionalDefines) {
+
+				var requiredDefines = optional.split (" ");
+				var matchRequired = true;
+
+				for (required in requiredDefines) {
+
+					var check = StringTools.trim (required);
+					if (check != "" && !defines.exists (check) && check != command) {
+
+						matchRequired = false;
+
+					}
+
+				}
+
+				if (matchRequired) {
+
+					matchOptional = true;
+
+				}
+
+			}
+
+			if (optionalDefines.length > 0 && matchOptional) {
+
+				return false;
+
+			}
+
+		}
+
 		if (section != "") {
-			
+
 			if (element.name != "section") {
-				
+
 				return false;
-				
+
 			}
-			
+
 			if (!element.has.id) {
-				
+
 				return false;
-				
+
 			}
-			
+
 			if (substitute (element.att.id) != section) {
-				
+
 				return false;
-				
+
 			}
-			
+
 		}
-		
+
 		return true;
-		
+
 	}
 	
 	
@@ -729,6 +783,11 @@ class ProjectXMLParser extends HXProject {
  						
  						if( element.has.command )
  							postBuildCommands.push( element.att.command );
+
+					case "preBuild":
+ 						
+ 						if( element.has.command )
+ 							preBuildCommands.push( element.att.command );
  
 					case "path":
 						
